@@ -26,6 +26,10 @@
   <img src="docs/expressions.png" width="720" alt="六个表情">
 </p>
 
+> **想要两个角色？** 社区做了一个[**双人互动版**](https://github.com/3108944309zpc-ctrl/baifanyu-xiaolongnv) ——
+> 在原版之上加了第二个角色「GPT 小龙女」、双人随机互动和预设剧情，同样完全离线。
+> 本仓库是原版，保持「一个人安静待着」。
+
 ---
 
 ## 作者
