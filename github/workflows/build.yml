@@ -1,0 +1,19 @@
+姓名: 构建安装包
+在……之上: [推,workflow_dispatch]
+工作:
+建立:
+连续的：Ubuntu-最新
+步骤:
+    - uses: 操作/结帐@v4
+    - 姓名: 设置JDK17
+uses: 操作/设置-Java@v4
+和……一起:
+java版: '17'
+分布: 'temurin'
+    - 姓名: 使用渐变生成
+跑: ./gradlew装配调试
+    - 姓名: 上传安装包
+uses: 操作/上载工件@v4
+和……一起:
+姓名: 白饭鱼-品尝-appk
+路径: app/build/outputs/apk/debug/*。apkgududepaihuaizhe@qq.co
