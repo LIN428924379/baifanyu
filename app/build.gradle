@@ -8,7 +8,7 @@ android {
         applicationId "com.whalepet"
         minSdk 24
         targetSdk 36
-        versionCode 22
+        versionCode 23
         versionName "0.9.0"
     }
 

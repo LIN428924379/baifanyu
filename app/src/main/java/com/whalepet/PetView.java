@@ -59,13 +59,24 @@ public class PetView extends View implements Choreographer.FrameCallback {
         public final String name, base;
         public final String[] faces;
         public final float hx0, hx1, hy0, hy1;
+        /**
+         * 趴左右边时的额外缩放（只作用于侧边，不影响趴下边）。
+         * 各套皮肤的头块比例不一样：饭盆头那块带整顶盆，同样宽度下看着更大，
+         * 所以给它单独收一点。
+         */
+        public final float perchSideScale;
 
         Skin(String name, String base, String[] faces) {
-            this(name, base, faces, DEF_HX0, DEF_HX1, DEF_HY0, DEF_HY1);
+            this(name, base, faces, DEF_HX0, DEF_HX1, DEF_HY0, DEF_HY1, 1f);
         }
 
         Skin(String name, String base, String[] faces,
              float hx0, float hx1, float hy0, float hy1) {
+            this(name, base, faces, hx0, hx1, hy0, hy1, 1f);
+        }
+
+        Skin(String name, String base, String[] faces,
+             float hx0, float hx1, float hy0, float hy1, float perchSideScale) {
             this.name = name;
             this.base = base;
             this.faces = faces;
@@ -73,6 +84,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
             this.hx1 = hx1;
             this.hy0 = hy0;
             this.hy1 = hy1;
+            this.perchSideScale = perchSideScale;
         }
     }
 
@@ -85,7 +97,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
                     DIR_BASIN + "pet_face_surprised.png",
                     DIR_BASIN + "pet_face_shy.png",
                     DIR_BASIN + "pet_face_confused.png",
-            }, 0.020f, 0.985f, 0.015f, 0.560f),
+            }, 0.020f, 0.985f, 0.015f, 0.560f, 0.85f),
             new Skin("女仆装", DIR_MAID + "pet_stand.png", new String[]{
                     DIR_MAID + "pet_face_happy.png",
                     DIR_MAID + "pet_face_sad.png",
@@ -320,7 +332,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
             float a = (headBX1 - headBX0) / (float) (headBY1 - headBY0);
             return dp(perchWidthDp) * a * 1.10f;
         }
-        return dp(perchWidthDp) * 1.10f;
+        return dp(perchWidthDp) * 1.10f * SKINS[skinIdx].perchSideScale;
     }
 
     /** 趴下边时她实际占的高度（用来把下巴精确落在屏幕下沿） */
@@ -329,7 +341,8 @@ public class PetView extends View implements Choreographer.FrameCallback {
         // 趴下边：滑块＝脑袋高度，窗口只需容下"呼吸"那点伸缩
         if (perchEdge == EDGE_BOTTOM) return dp(perchWidthDp) * 1.14f;
         // 趴左右：图转了 90°，用旋转坐标的长宽比
-        return dp(perchWidthDp) * (headY1 - headY0) / (float) (headX1 - headX0) * 1.16f;
+        return dp(perchWidthDp) * (headY1 - headY0) / (float) (headX1 - headX0) * 1.16f
+                * SKINS[skinIdx].perchSideScale;
     }
 
     @Override
@@ -408,7 +421,8 @@ public class PetView extends View implements Choreographer.FrameCallback {
         }
         if (rotCache == null || rotCache.isRecycled()) rotCache = rotate90(cur);
         int bw = headX1 - headX0, bh = headY1 - headY0;
-        float w = dp(perchWidthDp);
+        // 侧边：和 perchWindowW/H 用同一个系数，两边必须一起缩，只改窗口会把她裁掉
+        float w = dp(perchWidthDp) * SKINS[skinIdx].perchSideScale;
         float h = w * bh / (float) bw;
         final float tau = (float) (2 * Math.PI);
         float peek = w * 0.02f * (1f + (float) Math.sin(tau * t / 2.4f - 1.2f));
