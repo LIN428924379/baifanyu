@@ -8,8 +8,11 @@ android {
         applicationId "com.whalepet"
         minSdk 24
         targetSdk 36
-        versionCode 23
-        versionName "0.9.0"
+        // versionCode 与 versionName 必须成对改。
+        // 上次的坑：只替换了 versionCode，versionName 的字符串没匹配上，
+        // 结果连发 6 个版本，APK 里显示的还都是 0.9.0。
+        versionCode 24
+        versionName "0.9.7"
     }
 
     compileOptions {
