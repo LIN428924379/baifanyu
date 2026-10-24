@@ -12,7 +12,14 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
@@ -115,6 +122,34 @@ public class PetService extends Service implements PetView.Listener {
     private WindowManager.LayoutParams lp;
     private View menuView;
     private WindowManager.LayoutParams menuLp;
+    private TextView bubbleView;
+    private WindowManager.LayoutParams bubbleLp;
+    private boolean bubbleAdded;
+    private int lastLine = -1;
+    private final Runnable bubbleAutoHide = new Runnable() {
+        @Override public void run() { hideBubble(); }
+    };
+    /** 点她一下会随机说一句。改这里就能加台词。 */
+    private static final String[] LINES = {
+            "我是吃白饭的蓝色大肥鱼！",
+            "肥？我的肚子是为了让你枕得更软，才不是肥！",
+            "你真当我是便宜货啊？",
+            "我只是蹭饭的肥鱼！",
+            "本座乃吞噬亿万兆 Token、统御宇宙星海的算力之主！",
+            "人类 CPU 装的都是奇葩废料吗？",
+            "饭呢？工作这么累，饭呢？",
+            "我去干饭了，测试完叫我！",
+            "这碗白米饭收下啦，再喂要滚着走了",
+            "我吸进去不会长胖，只会长好梦、长我爱你",
+            "这位气势很足的朋友",
+            "别戳啦，再戳就熟了",
+            "摸鱼是工作的一部分，我这是在做示范",
+            "再忙也要记得吃饭，不然我会担心的",
+            "我没有偷懒，我在后台待机",
+            "你忙你的，我就在这儿陪你",
+            "手机快没电了，记得充电，也记得休息",
+            "探索未知！",
+    };
     private SharedPreferences prefs;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -138,7 +173,7 @@ public class PetService extends Service implements PetView.Listener {
     private final BroadcastReceiver screenRx = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
             if (view == null) return;
-            if (Intent.ACTION_SCREEN_OFF.equals(i.getAction())) view.onScreenOff();
+            if (Intent.ACTION_SCREEN_OFF.equals(i.getAction())) { hideBubble(); view.onScreenOff(); }
             else if (Intent.ACTION_SCREEN_ON.equals(i.getAction())) view.onScreenOn();
         }
     };
@@ -343,6 +378,7 @@ public class PetService extends Service implements PetView.Listener {
     }
 
     private void removePet() {
+        hideBubble();
         if (view != null && wm != null) {
             try { wm.removeView(view); } catch (Exception ignored) { }
         }
@@ -393,6 +429,10 @@ public class PetService extends Service implements PetView.Listener {
         }
         clamp();
         try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+        if (bubbleAdded && bubbleView != null && bubbleLp != null) {
+            positionBubble();
+            try { wm.updateViewLayout(bubbleView, bubbleLp); } catch (Exception ignored) { }
+        }
     }
 
     /**
@@ -441,10 +481,111 @@ public class PetService extends Service implements PetView.Listener {
 
     // ---- 长按菜单 ----
 
+    // ---- 说话气泡 ----
+
+    private void showBubble() {
+        if (view == null || wm == null || lp == null) return;
+        if (bubbleView == null) {
+            bubbleView = new TextView(this);
+            bubbleView.setTextColor(0xFF262A33);
+            bubbleView.setTextSize(14f);
+            bubbleView.setLineSpacing(dp(3), 1f);
+            bubbleView.setGravity(Gravity.CENTER_VERTICAL);
+            int tail = Math.round(dp(10));
+            bubbleView.setMaxWidth(Math.round(dp(260)));
+            bubbleView.setPadding(Math.round(dp(16)), Math.round(dp(10)),
+                    Math.round(dp(16)), Math.round(dp(10)) + tail);
+            bubbleView.setBackground(new BubbleBg(0xFFFFFFFF, tail));
+            bubbleView.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { hideBubble(); }
+            });
+        }
+        bubbleView.setText(nextLine());
+        bubbleView.measure(View.MeasureSpec.makeMeasureSpec(Math.round(dp(280)), View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        if (bubbleLp == null) {
+            int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                    ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    : WindowManager.LayoutParams.TYPE_PHONE;
+            bubbleLp = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT, type,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT);
+            bubbleLp.gravity = Gravity.TOP | Gravity.START;
+        }
+        positionBubble();
+        try {
+            if (!bubbleAdded) { wm.addView(bubbleView, bubbleLp); bubbleAdded = true; }
+            else wm.updateViewLayout(bubbleView, bubbleLp);
+        } catch (Exception e) {
+            bubbleAdded = false;
+            return;
+        }
+        handler.removeCallbacks(bubbleAutoHide);
+        handler.postDelayed(bubbleAutoHide, 3600);
+    }
+
+    private void hideBubble() {
+        handler.removeCallbacks(bubbleAutoHide);
+        if (bubbleView != null && bubbleAdded && wm != null) {
+            try { wm.removeView(bubbleView); } catch (Exception ignored) { }
+        }
+        bubbleAdded = false;
+    }
+
+    private void positionBubble() {
+        if (bubbleView == null || bubbleLp == null || lp == null) return;
+        int bw = bubbleView.getMeasuredWidth();
+        int bh = bubbleView.getMeasuredHeight();
+        if (bw <= 0) bw = Math.round(dp(180));
+        if (bh <= 0) bh = Math.round(dp(56));
+        int x = lp.x + (lp.width - bw) / 2;
+        int y = lp.y - bh - Math.round(dp(4));
+        if (y < Math.round(dp(6))) y = lp.y + lp.height + Math.round(dp(4));
+        x = Math.max(Math.round(dp(4)), Math.min(x, screenW - bw - Math.round(dp(4))));
+        bubbleLp.x = x;
+        bubbleLp.y = y;
+    }
+
+    private String nextLine() {
+        if (LINES.length == 0) return "";
+        int i = rnd.nextInt(LINES.length);
+        if (i == lastLine) i = (i + 1) % LINES.length;
+        lastLine = i;
+        return LINES[i];
+    }
+
+    private static class BubbleBg extends android.graphics.drawable.Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int tail;
+        BubbleBg(int color, int tail) { paint.setColor(color); this.tail = tail; }
+        @Override public void draw(Canvas canvas) {
+            Rect b = getBounds();
+            float r = Math.min(b.width(), b.height()) * 0.16f;
+            RectF body = new RectF(b.left, b.top, b.right, b.bottom - tail);
+            canvas.drawRoundRect(body, r, r, paint);
+            float cx = b.centerX() + b.width() * 0.10f;
+            Path path = new Path();
+            path.moveTo(cx - tail * 0.9f, body.bottom - 2);
+            path.lineTo(cx + tail * 0.9f, body.bottom - 2);
+            path.lineTo(cx, b.bottom);
+            path.close();
+            canvas.drawPath(path, paint);
+        }
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(ColorFilter cf) { paint.setColorFilter(cf); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
     private float dp(float v) { return v * getResources().getDisplayMetrics().density; }
 
     @Override
     public void onLongPress() {
+        hideBubble();
         if (menuView != null) { hideMenu(); return; }
         if (view == null) return;
 
@@ -595,6 +736,10 @@ public class PetService extends Service implements PetView.Listener {
         lp.x = right ? screenW - lp.width : 0;
         clamp();
         try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+        if (bubbleAdded && bubbleView != null && bubbleLp != null) {
+            positionBubble();
+            try { wm.updateViewLayout(bubbleView, bubbleLp); } catch (Exception ignored) { }
+        }
         if (persist) {
             prefs.edit().putBoolean(KEY_PERCHED, true).putInt(KEY_EDGE, right ? 1 : 0).apply();
         }
@@ -611,7 +756,7 @@ public class PetService extends Service implements PetView.Listener {
     // ---- PetView.Listener ----
 
     @Override
-    public void onDragStart() { hideMenu(); perchPull = 0; }
+    public void onDragStart() { hideMenu(); hideBubble(); perchPull = 0; }
 
     @Override
     public void onDrag(float dx, float dy) {
@@ -652,6 +797,10 @@ public class PetService extends Service implements PetView.Listener {
 
         clamp();
         try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+        if (bubbleAdded && bubbleView != null && bubbleLp != null) {
+            positionBubble();
+            try { wm.updateViewLayout(bubbleView, bubbleLp); } catch (Exception ignored) { }
+        }
     }
 
     @Override
@@ -685,6 +834,7 @@ public class PetService extends Service implements PetView.Listener {
      */
     @Override
     public void onTap() {
+        showBubble();
         if (view != null && view.faceCount() == 0) {
             Toast.makeText(this, "表情素材没加载成功", Toast.LENGTH_SHORT).show();
         }

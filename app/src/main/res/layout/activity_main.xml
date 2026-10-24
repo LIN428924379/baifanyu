@@ -189,7 +189,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
-                android:text="两套形象，点下面按钮切换"
+                android:text="点下面按钮切换皮肤"
                 android:textColor="@color/ink3"
                 android:textSize="11sp" />
 
@@ -199,7 +199,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/btn_ghost"
-                android:text="皮肤：女仆装　▸ 点击切换"
+                android:text="皮肤：奶油卫衣　▸ 点击切换"
                 android:textColor="@color/ink"
                 android:textSize="15sp" />
         </LinearLayout>
@@ -348,3 +348,4 @@
             android:layout_height="24dp" />
     </LinearLayout>
 </ScrollView>
+

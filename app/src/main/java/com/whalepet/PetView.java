@@ -39,7 +39,11 @@ public class PetView extends View implements Choreographer.FrameCallback {
     /** 扒在哪条边上 */
     public static final int EDGE_LEFT = 0, EDGE_RIGHT = 1, EDGE_BOTTOM = 2;
 
+    private static final String DIR_CLAUDE = "skins/claude/";
     private static final String DIR_MAID = "skins/maid/";
+    private static final String DIR_WINTER_WHITE = "skins/winter_white/";
+    private static final String DIR_WINTER_BLUE = "skins/winter_blue/";
+    private static final String DIR_BERET = "skins/beret/";
     private static final String DIR_BASIN = "skins/basin/";
 
     // 头部区块的默认比例（女仆装那套调的）
@@ -90,14 +94,14 @@ public class PetView extends View implements Choreographer.FrameCallback {
 
     // 第一套是默认皮肤
     public static final Skin[] SKINS = {
-            new Skin("饭盆头", DIR_BASIN + "pet_stand.png", new String[]{
-                    DIR_BASIN + "pet_face_happy.png",
-                    DIR_BASIN + "pet_face_sad.png",
-                    DIR_BASIN + "pet_face_angry.png",
-                    DIR_BASIN + "pet_face_surprised.png",
-                    DIR_BASIN + "pet_face_shy.png",
-                    DIR_BASIN + "pet_face_confused.png",
-            }, 0.020f, 0.985f, 0.015f, 0.560f, 0.85f),
+            new Skin("Claude", DIR_CLAUDE + "pet_stand.png", new String[]{
+                    DIR_CLAUDE + "pet_face_happy.png",
+                    DIR_CLAUDE + "pet_face_sad.png",
+                    DIR_CLAUDE + "pet_face_angry.png",
+                    DIR_CLAUDE + "pet_face_surprised.png",
+                    DIR_CLAUDE + "pet_face_shy.png",
+                    DIR_CLAUDE + "pet_face_confused.png",
+            }, 0.128f, 0.91f, 0.01f, 0.50f, 0.9f),
             new Skin("女仆装", DIR_MAID + "pet_stand.png", new String[]{
                     DIR_MAID + "pet_face_happy.png",
                     DIR_MAID + "pet_face_sad.png",
@@ -105,7 +109,39 @@ public class PetView extends View implements Choreographer.FrameCallback {
                     DIR_MAID + "pet_face_surprised.png",
                     DIR_MAID + "pet_face_shy.png",
                     DIR_MAID + "pet_face_confused.png",
-            }),
+            }, 0.076f, 0.929f, 0.01f, 0.50f, 0.9f),
+            new Skin("白色冬装", DIR_WINTER_WHITE + "pet_stand.png", new String[]{
+                    DIR_WINTER_WHITE + "pet_face_happy.png",
+                    DIR_WINTER_WHITE + "pet_face_sad.png",
+                    DIR_WINTER_WHITE + "pet_face_angry.png",
+                    DIR_WINTER_WHITE + "pet_face_surprised.png",
+                    DIR_WINTER_WHITE + "pet_face_shy.png",
+                    DIR_WINTER_WHITE + "pet_face_confused.png",
+            }, 0.107f, 0.923f, 0.01f, 0.50f, 0.9f),
+            new Skin("蓝色冬装", DIR_WINTER_BLUE + "pet_stand.png", new String[]{
+                    DIR_WINTER_BLUE + "pet_face_happy.png",
+                    DIR_WINTER_BLUE + "pet_face_sad.png",
+                    DIR_WINTER_BLUE + "pet_face_angry.png",
+                    DIR_WINTER_BLUE + "pet_face_surprised.png",
+                    DIR_WINTER_BLUE + "pet_face_shy.png",
+                    DIR_WINTER_BLUE + "pet_face_confused.png",
+            }, 0.139f, 0.872f, 0.01f, 0.50f, 0.9f),
+            new Skin("贝雷帽", DIR_BERET + "pet_stand.png", new String[]{
+                    DIR_BERET + "pet_face_happy.png",
+                    DIR_BERET + "pet_face_sad.png",
+                    DIR_BERET + "pet_face_angry.png",
+                    DIR_BERET + "pet_face_surprised.png",
+                    DIR_BERET + "pet_face_shy.png",
+                    DIR_BERET + "pet_face_confused.png",
+            }, 0.086f, 0.911f, 0.01f, 0.50f, 0.9f),
+            new Skin("饭盆头", DIR_BASIN + "pet_stand.png", new String[]{
+                    DIR_BASIN + "pet_face_happy.png",
+                    DIR_BASIN + "pet_face_sad.png",
+                    DIR_BASIN + "pet_face_angry.png",
+                    DIR_BASIN + "pet_face_surprised.png",
+                    DIR_BASIN + "pet_face_shy.png",
+                    DIR_BASIN + "pet_face_confused.png",
+            }, 0.111f, 0.9f, 0.01f, 0.50f, 0.85f),
     };
 
     private static final float NS = 1_000_000_000f;
@@ -307,6 +343,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
             frameIntervalNs = (long) (NS / (s == STATE_PERCH ? 20 : 30));
             requestLayout();
             invalidate();
+            if (s == STATE_HOVER) startLoop();
         }
     }
 
@@ -361,15 +398,17 @@ public class PetView extends View implements Choreographer.FrameCallback {
         float t = (now - startNs) / NS;
 
         final float tau = (float) (2 * Math.PI);
-        pDy = 0.022f * ampScale * (float) Math.sin(tau * t / 2.4f);
+        // 扒边时她应该安静贴着，不再浮沉/呼吸/点动
+        boolean still = state == STATE_PERCH;
+        pDy = still ? 0f : 0.022f * ampScale * (float) Math.sin(tau * t / 2.4f);
         pSx = 1f;
-        pSy = 1f + 0.014f * ampScale * (float) Math.sin(tau * 2 * t / 2.4f);
+        pSy = still ? 1f : 1f + 0.014f * ampScale * (float) Math.sin(tau * 2 * t / 2.4f);
 
-        if (dragging) {
+        if (!still && dragging) {
             pSx += 0.05f * Math.abs(dragTilt) / 9f;
             pSy -= 0.02f * Math.abs(dragTilt) / 9f;
         }
-        if (walking) {
+        if (!still && walking) {
             // 挪动时左右摇 + 上下颠。只平移不摇的话，看着像贴纸在滑，不像在走。
             float wk = tau * t * 1.9f;
             pDy += 0.016f * ampScale * Math.abs((float) Math.sin(wk));
@@ -378,7 +417,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
         } else if (!dragging) {
             dragTilt = 0f;
         }
-        if (tapNs != 0) {
+        if (!still && tapNs != 0) {
             float k = (now - tapNs) / (0.30f * NS);
             if (k >= 1f) tapNs = 0;
             else pSy *= 1f - 0.10f * (float) Math.sin(Math.PI * k);
@@ -424,8 +463,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
         // 侧边：和 perchWindowW/H 用同一个系数，两边必须一起缩，只改窗口会把她裁掉
         float w = dp(perchWidthDp) * SKINS[skinIdx].perchSideScale;
         float h = w * bh / (float) bw;
-        final float tau = (float) (2 * Math.PI);
-        float peek = w * 0.02f * (1f + (float) Math.sin(tau * t / 2.4f - 1.2f));
+        float peek = 0f;   // 扒边时不动，连探头的小动作也省掉
         float hh2 = h * pSy;
         float top = (getHeight() - hh2) / 2f + pDy * h;
 
@@ -443,6 +481,8 @@ public class PetView extends View implements Choreographer.FrameCallback {
     @Override
     public void doFrame(long frameTimeNanos) {
         if (!windowVisible) { looping = false; return; }
+        // 扒边时静止：停掉帧循环，省电；点她换表情时 invalidate 仍会画一帧
+        if (state == STATE_PERCH) { looping = false; return; }
         if (frameTimeNanos - lastFrameNs >= frameIntervalNs) {
             lastFrameNs = frameTimeNanos;
             invalidate();
