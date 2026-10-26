@@ -7,11 +7,17 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.ArrayList;
 
 public class MainActivity extends Activity {
 
@@ -22,8 +28,11 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private TextView tvStatus, tvHover, tvPerch, tvAmp;
     private SeekBar sbHover, sbPerch, sbAmp;
-    private Button btnPerm, btnToggle, btnFace, btnSkin, btnSoundDiag, btnDuck;
+    private Button btnPerm, btnToggle, btnFace, btnSkin, btnDuck;
     private Switch swSound, swWander;
+    private LinearLayout llLines;
+    private EditText etNewLine;
+    private Button btnBubbleLight, btnBubbleDark, btnAddLine, btnResetLines;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -52,8 +61,30 @@ public class MainActivity extends Activity {
             sendAction(PetService.ACTION_PREVIEW_DUCK);   // 点一下立刻试听
         });
 
-        btnSoundDiag = findViewById(R.id.btnSoundDiag);
-        btnSoundDiag.setOnClickListener(v -> sendAction(PetService.ACTION_SOUND_DIAG));
+
+        llLines = findViewById(R.id.llLines);
+        etNewLine = findViewById(R.id.etNewLine);
+        btnBubbleLight = findViewById(R.id.btnBubbleLight);
+        btnBubbleDark = findViewById(R.id.btnBubbleDark);
+        btnAddLine = findViewById(R.id.btnAddLine);
+        btnResetLines = findViewById(R.id.btnResetLines);
+
+        btnBubbleLight.setOnClickListener(v -> {
+            prefs.edit().putInt(PetService.KEY_BUBBLE_STYLE, 0).apply();
+            syncBubbleUi();
+            sendAction(PetService.ACTION_REFRESH);
+        });
+        btnBubbleDark.setOnClickListener(v -> {
+            prefs.edit().putInt(PetService.KEY_BUBBLE_STYLE, 1).apply();
+            syncBubbleUi();
+            sendAction(PetService.ACTION_REFRESH);
+        });
+        btnAddLine.setOnClickListener(v -> addLine());
+        btnResetLines.setOnClickListener(v -> {
+            prefs.edit().remove(PetService.KEY_LINES).apply();
+            renderLines();
+            Toast.makeText(this, "已恢复默认台词", Toast.LENGTH_SHORT).show();
+        });
 
         btnSkin = findViewById(R.id.btnSkin);
         btnSkin.setOnClickListener(v -> {
@@ -123,6 +154,98 @@ public class MainActivity extends Activity {
         super.onPause();
     }
 
+    private void syncBubbleUi() {
+        int style = prefs.getInt(PetService.KEY_BUBBLE_STYLE, 0);
+        if (btnBubbleLight != null) btnBubbleLight.setText(style == 0 ? "● 白色气泡" : "白色气泡");
+        if (btnBubbleDark != null) btnBubbleDark.setText(style == 1 ? "● 深色气泡" : "深色气泡");
+        renderLines();
+    }
+
+    private ArrayList<String> loadLines() {
+        ArrayList<String> out = new ArrayList<>();
+        String raw = prefs.getString(PetService.KEY_LINES, "");
+        if (raw != null) {
+            for (String line : raw.split("\n")) {
+                String t = line.trim();
+                if (!t.isEmpty()) out.add(t);
+            }
+        }
+        if (out.isEmpty()) {
+            for (String line : PetService.DEFAULT_LINES) out.add(line);
+        }
+        return out;
+    }
+
+    private void persistLines(ArrayList<String> lines) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.size(); i++) {
+            if (i > 0) sb.append('\n');
+            sb.append(lines.get(i));
+        }
+        prefs.edit().putString(PetService.KEY_LINES, sb.toString()).apply();
+    }
+
+    private void renderLines() {
+        if (llLines == null) return;
+        llLines.removeAllViews();
+        final ArrayList<String> lines = loadLines();
+        for (int i = 0; i < lines.size(); i++) {
+            final int idx = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+
+            TextView tv = new TextView(this);
+            tv.setText(lines.get(i));
+            tv.setTextSize(13);
+            tv.setTextColor(getColor(R.color.ink));
+            tv.setPadding(dp(8), dp(7), dp(8), dp(7));
+            tv.setLayoutParams(new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            row.addView(tv);
+
+            Button del = new Button(this);
+            del.setText("删");
+            del.setAllCaps(false);
+            del.setTextSize(12);
+            del.setTextColor(getColor(R.color.ink));
+            del.setBackgroundResource(R.drawable.btn_ghost);
+            del.setMinWidth(0);
+            del.setMinimumWidth(0);
+            del.setPadding(dp(10), 0, dp(10), 0);
+            del.setOnClickListener(v -> {
+                ArrayList<String> cur = loadLines();
+                if (cur.size() <= 1) {
+                    Toast.makeText(this, "至少留一句", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                cur.remove(idx);
+                persistLines(cur);
+                renderLines();
+            });
+            row.addView(del);
+
+            llLines.addView(row);
+        }
+    }
+
+    private void addLine() {
+        String text = etNewLine.getText().toString().trim();
+        if (text.isEmpty()) {
+            Toast.makeText(this, "先写一句台词", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ArrayList<String> lines = loadLines();
+        lines.add(text);
+        persistLines(lines);
+        etNewLine.setText("");
+        renderLines();
+    }
+
+    private int dp(float v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
     private String duckLabel(int idx) {
         return "音效 " + (idx + 1) + " / " + PetService.DUCK_COUNT + "　▸ 点击试听";
     }
@@ -158,6 +281,8 @@ public class MainActivity extends Activity {
 
         int ski = prefs.getInt(PetService.KEY_SKIN, 0);
         btnSkin.setText(skinLabel(ski));
+
+        syncBubbleUi();
 
         boolean overlay = hasOverlay();
         boolean running = prefs.getBoolean(PetService.KEY_RUNNING, false);

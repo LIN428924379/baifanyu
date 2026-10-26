@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bgPage"
+    android:background="@drawable/bg_page"
     android:fillViewport="true">
 
     <LinearLayout
@@ -15,21 +15,22 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_card"
+            android:background="@drawable/bg_header"
+            android:elevation="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="16dp">
+            android:padding="18dp">
 
             <ImageView
-                android:layout_width="86dp"
-                android:layout_height="110dp"
+                android:layout_width="92dp"
+                android:layout_height="120dp"
                 android:scaleType="fitCenter"
                 android:src="@drawable/pet_header" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
+                android:layout_marginStart="16dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -37,17 +38,30 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/app_name"
-                    android:textColor="@color/ink"
-                    android:textSize="25sp"
+                    android:textColor="@color/inkOnDark"
+                    android:textSize="26sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_pill"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:text="v0.12.17 · 六套皮肤"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:lineSpacingExtra="3dp"
                     android:text="@string/app_sub"
-                    android:textColor="@color/ink2"
+                    android:textColor="@color/headerSub"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
@@ -67,6 +81,7 @@
         <!-- 主操作 -->
         <Button
             android:id="@+id/btnPerm"
+                    android:textAllCaps="false"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_marginTop="14dp"
@@ -77,6 +92,7 @@
 
         <Button
             android:id="@+id/btnToggle"
+                    android:textAllCaps="false"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_marginTop="10dp"
@@ -107,19 +123,12 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="调节"
+                android:text="🎚 调节"
                 android:textColor="@color/ink"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:lineSpacingExtra="2dp"
-                android:text="大小分两处：悬空时看整体高度，扒在边上时只有脑袋露出来、看的是脑袋宽度。"
-                android:textColor="@color/ink3"
-                android:textSize="11sp" />
+            
 
             <TextView
                 android:id="@+id/tvHover"
@@ -160,12 +169,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="动得晃眼就往左拉，太安静就往右拉。"
-                android:textColor="@color/ink3"
-                android:textSize="11sp" />
+            
         </LinearLayout>
 
         <!-- 皮肤 -->
@@ -180,21 +184,14 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="皮肤"
+                android:text="🎨 皮肤"
                 android:textColor="@color/ink"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="点下面按钮切换皮肤"
-                android:textColor="@color/ink3"
-                android:textSize="11sp" />
-
-            <Button
+                <Button
                 android:id="@+id/btnSkin"
+                    android:textAllCaps="false"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
@@ -203,7 +200,6 @@
                 android:textColor="@color/ink"
                 android:textSize="15sp" />
         </LinearLayout>
-
 
         <!-- 自动溜达 -->
         <LinearLayout
@@ -224,7 +220,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="自动溜达"
+                    android:text="🚶 自动溜达"
                     android:textColor="@color/ink"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -233,7 +229,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
-                    android:text="闲着的时候她自己爬来爬去（碰她、拖她、趴边时不动）"
+                    android:text="闲着时自己爬来爬去"
                     android:textColor="@color/ink3"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -250,37 +246,43 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
             android:background="@drawable/bg_card"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:padding="16dp">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="小黄鸭音效"
-                    android:textColor="@color/ink"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                <TextView
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🐤 小黄鸭音效"
+                        android:textColor="@color/ink"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="点她一下，吱一声"
+                        android:textColor="@color/ink3"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <Switch
+                    android:id="@+id/swSound"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="点她一下，吱一声"
-                    android:textColor="@color/ink3"
-                    android:textSize="11sp" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
-
-            <Switch
-                android:id="@+id/swSound"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
 
             <Button
                 android:id="@+id/btnDuck"
@@ -289,22 +291,14 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/btn_ghost"
                 android:text="音效 1 / 8　▸ 点击试听"
+                android:textAllCaps="false"
                 android:textColor="@color/ink"
                 android:textSize="14sp" />
 
-            <Button
-                android:id="@+id/btnSoundDiag"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/btn_ghost"
-                android:text="音效诊断 / 测试"
-                android:textColor="@color/ink"
-                android:textSize="14sp" />
-
+            
         </LinearLayout>
 
-        <!-- 用法 -->
+        <!-- 气泡与台词 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -316,32 +310,95 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="怎么玩"
+                android:text="💬 气泡与台词"
                 android:textColor="@color/ink"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <TextView
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnBubbleLight"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_ghost"
+                    android:text="● 白色气泡"
+                    android:textAllCaps="false"
+                    android:textColor="@color/ink"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/btnBubbleDark"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_ghost"
+                    android:text="深色气泡"
+                    android:textAllCaps="false"
+                    android:textColor="@color/ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/llLines"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:lineSpacingExtra="6dp"
-                android:text="· 按住她，拖到任意位置\n· 拖到屏幕左右边缘松手 —— 她会扒在边上，只露一个脑袋看着你\n· 从边缘往外拖，回到悬空状态\n· 点她一下，换一个表情\n· 长按她，弹出「设置 / 关闭」"
-                android:textColor="@color/ink2"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/etNewLine"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_ghost"
+                    android:hint="再加一句…"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:padding="10dp"
+                    android:textColor="@color/ink"
+                    android:textColorHint="@color/ink3"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnAddLine"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/btn_primary"
+                    android:minWidth="0dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="添加"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnResetLines"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/btn_ghost"
+                android:text="恢复默认 18 句"
+                android:textAllCaps="false"
+                android:textColor="@color/ink"
                 android:textSize="13sp" />
         </LinearLayout>
-
-        <!-- 省电提示 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:background="@drawable/bg_warn"
-            android:lineSpacingExtra="4dp"
-            android:padding="14dp"
-            android:text="她要是过一会儿不见了，多半是被系统省电策略杀掉了。到系统设置里给她加上「自启动」和「后台运行无限制」。小米 / 华为 / OPPO / vivo 都需要这一步。"
-            android:textColor="@color/warnInk"
-            android:textSize="12sp" />
 
         <View
             android:layout_width="match_parent"

@@ -11,4 +11,6 @@
     <color name="line">#E3E9F7</color>
     <color name="warnBg">#FFF6E6</color>
     <color name="warnInk">#8A6417</color>
+    <color name="inkOnDark">#F6F9FF</color>
+    <color name="headerSub">#C9D6F5</color>
 </resources>

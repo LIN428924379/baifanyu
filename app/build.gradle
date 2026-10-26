@@ -11,8 +11,8 @@ android {
         // versionCode 与 versionName 必须成对改。
         // 上次的坑：只替换了 versionCode，versionName 的字符串没匹配上，
         // 结果连发 6 个版本，APK 里显示的还都是 0.9.0。
-        versionCode 32
-        versionName "0.12.1"
+        versionCode 48
+        versionName "0.12.17"
     }
 
     compileOptions {

@@ -60,7 +60,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
      * 沿用同一套比例会把盆的右边切掉一块。
      */
     public static final class Skin {
-        public final String name, base;
+        public final String name, base, dir;
         public final String[] faces;
         public final float hx0, hx1, hy0, hy1;
         /**
@@ -83,6 +83,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
              float hx0, float hx1, float hy0, float hy1, float perchSideScale) {
             this.name = name;
             this.base = base;
+            this.dir = base.substring(0, base.lastIndexOf('/') + 1);
             this.faces = faces;
             this.hx0 = hx0;
             this.hx1 = hx1;
@@ -94,7 +95,15 @@ public class PetView extends View implements Choreographer.FrameCallback {
 
     // 第一套是默认皮肤
     public static final Skin[] SKINS = {
-            new Skin("Claude", DIR_CLAUDE + "pet_stand.png", new String[]{
+            new Skin("白色冬装", DIR_WINTER_WHITE + "pet_stand.png", new String[]{
+                    DIR_WINTER_WHITE + "pet_face_happy.png",
+                    DIR_WINTER_WHITE + "pet_face_sad.png",
+                    DIR_WINTER_WHITE + "pet_face_angry.png",
+                    DIR_WINTER_WHITE + "pet_face_surprised.png",
+                    DIR_WINTER_WHITE + "pet_face_shy.png",
+                    DIR_WINTER_WHITE + "pet_face_confused.png",
+            }, 0.107f, 0.923f, 0.01f, 0.50f, 0.9f),
+            new Skin("ClaudeSeek", DIR_CLAUDE + "pet_stand.png", new String[]{
                     DIR_CLAUDE + "pet_face_happy.png",
                     DIR_CLAUDE + "pet_face_sad.png",
                     DIR_CLAUDE + "pet_face_angry.png",
@@ -110,14 +119,6 @@ public class PetView extends View implements Choreographer.FrameCallback {
                     DIR_MAID + "pet_face_shy.png",
                     DIR_MAID + "pet_face_confused.png",
             }, 0.076f, 0.929f, 0.01f, 0.50f, 0.9f),
-            new Skin("白色冬装", DIR_WINTER_WHITE + "pet_stand.png", new String[]{
-                    DIR_WINTER_WHITE + "pet_face_happy.png",
-                    DIR_WINTER_WHITE + "pet_face_sad.png",
-                    DIR_WINTER_WHITE + "pet_face_angry.png",
-                    DIR_WINTER_WHITE + "pet_face_surprised.png",
-                    DIR_WINTER_WHITE + "pet_face_shy.png",
-                    DIR_WINTER_WHITE + "pet_face_confused.png",
-            }, 0.107f, 0.923f, 0.01f, 0.50f, 0.9f),
             new Skin("蓝色冬装", DIR_WINTER_BLUE + "pet_stand.png", new String[]{
                     DIR_WINTER_BLUE + "pet_face_happy.png",
                     DIR_WINTER_BLUE + "pet_face_sad.png",
@@ -141,7 +142,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
                     DIR_BASIN + "pet_face_surprised.png",
                     DIR_BASIN + "pet_face_shy.png",
                     DIR_BASIN + "pet_face_confused.png",
-            }, 0.111f, 0.9f, 0.01f, 0.50f, 0.85f),
+            }, 0.111f, 0.900f, 0.01f, 0.50f, 0.85f),
     };
 
     private static final float NS = 1_000_000_000f;
@@ -153,6 +154,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
         void onDragEnd(float rawX, float rawY);
         void onTap();
         void onLongPress();
+        void onWanderSeqEnd();
     }
 
     private Context ctx;
@@ -160,6 +162,20 @@ public class PetView extends View implements Choreographer.FrameCallback {
     private Bitmap faceBmp;      // 当前表情（需要回收）
     private Bitmap cur;          // 当前显示的那张
     private Bitmap rotCache;     // cur 的 90° 版本，趴边用，按需生成
+    private Bitmap[] walkBmp;    // 走路序列帧（没有素材时为 null）
+    private float walkPhase;     // 按位移累计的帧相位
+    private long walkLastNs;
+    private static final int[] WALK_ORDER = {0, 2, 1, 2};  // 左步 → 过渡 → 右步 → 过渡
+    private static final int SEQ_COUNT = 97;
+    private static final long SEQ_FRAME_NS = 1_000_000_000L / 12;
+    private String seqDir;
+    private boolean seqPlaying;
+    private long seqStartNs;
+    private int seqIdx = -1;
+    private Bitmap seqBmp;
+    private boolean seqMirror;
+    private long settleNs;
+    private long walkStartNs;
 
     private int skinIdx = 0, faceCur = 0;
     private boolean[] faceOk = new boolean[0];
@@ -237,6 +253,77 @@ public class PetView extends View implements Choreographer.FrameCallback {
 
     // ---------------- 皮肤 ----------------
 
+    private void loadWalkFrames(String dir) {
+        seqDir = dir + "seq/";
+        seqPlaying = false; seqStartNs = 0; seqIdx = -1;
+        if (seqBmp != null && !seqBmp.isRecycled()) seqBmp.recycle();
+        seqBmp = null;
+        if (walkBmp != null) {
+            for (Bitmap b : walkBmp) if (b != null && !b.isRecycled()) b.recycle();
+            walkBmp = null;
+        }
+        Bitmap[] arr = new Bitmap[4];
+        for (int i = 0; i < 4; i++) {
+            Bitmap b = decode(dir + "walk_" + (i + 1) + ".png");
+            if (b == null) {
+                for (Bitmap x : arr) if (x != null && !x.isRecycled()) x.recycle();
+                return;
+            }
+            arr[i] = b;
+        }
+        walkBmp = arr;
+    }
+
+    public boolean hasWanderSeq() {
+        return seqDir != null && assetExists(seqDir + "seq_000.webp");
+    }
+
+    public boolean isWanderSeqPlaying() { return seqPlaying; }
+
+    public int getSeqFrame() { return seqIdx; }
+
+    public void setSeqMirror(boolean m) { seqMirror = m; }
+
+    public void playWanderSeq() {
+        if (!hasWanderSeq()) return;
+        seqPlaying = true;
+        seqStartNs = 0;
+        seqIdx = -1;
+        invalidate();
+    }
+
+    public void stopWanderSeq() { seqPlaying = false; }
+
+    private boolean drawSeq(Canvas canvas, long now) {
+        if (seqStartNs == 0) seqStartNs = now;
+        int idx = (int) ((now - seqStartNs) / SEQ_FRAME_NS);
+        if (idx >= SEQ_COUNT) {
+            seqPlaying = false;
+            if (listener != null) listener.onWanderSeqEnd();
+            return false;
+        }
+        if (idx != seqIdx) {
+            if (seqBmp != null && !seqBmp.isRecycled()) seqBmp.recycle();
+            seqBmp = decode(seqDir + String.format("seq_%03d.webp", idx));
+            seqIdx = idx;
+            if (seqBmp == null) { seqPlaying = false; return false; }
+        }
+        float h = dp(hoverHeightDp);
+        float w = h * srcW / (float) srcH;
+        float ww = getWidth(), hh = getHeight();
+        float cx = ww / 2f;
+        // 和 drawHover 用完全相同的呼吸变换，切回站立时不跳位置
+        float bottom = hh - h * 0.08f + pDy * h;
+        float top = bottom - h * pSy;
+        float halfW = w * pSx / 2f;
+        RectF dst = new RectF(cx - halfW, top, cx + halfW, bottom);
+        canvas.save();
+        if (seqMirror) canvas.scale(-1f, 1f, cx, 0f);
+        canvas.drawBitmap(seqBmp, null, dst, paint);
+        canvas.restore();
+        return true;
+    }
+
     public void applySkin(int idx) {
         if (idx < 0 || idx >= SKINS.length) return;
         Skin s = SKINS[idx];
@@ -248,6 +335,7 @@ public class PetView extends View implements Choreographer.FrameCallback {
         skinIdx = idx;
         faceCur = 0;
         baseBmp = decode(s.base);
+        loadWalkFrames(s.dir);
 
         // 只认真正存在的表情文件 —— 这样素材没到齐也不会切到空白
         faceOk = new boolean[s.faces.length];
@@ -327,9 +415,18 @@ public class PetView extends View implements Choreographer.FrameCallback {
     // ---- 自动溜达：Service 挪窗口，这里只管"走路的样子" ----
     private boolean walking = false;
     private long lastTouchMs = System.currentTimeMillis();
+    private float walkVel = 0f, walkDir = 1f;
+    private long walkStopNs = 0L;
 
     public void setWalking(boolean w) {
+        if (walking && !w) { walkStopNs = System.nanoTime(); walkStartNs = 0; walkPhase = 0f; walkLastNs = 0L; }
         if (walking != w) { walking = w; invalidate(); }
+    }
+
+    /** 服务端把当前速度和方向传进来，动画按真实速度变化，起步/刹车才不会僵 */
+    public void setWalkMotion(float vel, float dir) {
+        if (dir != 0f) walkDir = dir;
+        walkVel = Math.max(0f, vel);
     }
 
     /** 距离上一次碰她过了多久（毫秒）—— 刚碰过就先别乱跑 */
@@ -408,12 +505,23 @@ public class PetView extends View implements Choreographer.FrameCallback {
             pSx += 0.05f * Math.abs(dragTilt) / 9f;
             pSy -= 0.02f * Math.abs(dragTilt) / 9f;
         }
-        if (!still && walking) {
-            // 挪动时左右摇 + 上下颠。只平移不摇的话，看着像贴纸在滑，不像在走。
-            float wk = tau * t * 1.9f;
-            pDy += 0.016f * ampScale * Math.abs((float) Math.sin(wk));
-            pSy *= 1f + 0.018f * ampScale * (float) Math.sin(wk * 2f);
-            dragTilt = 5.5f * (float) Math.sin(wk);
+        if (!still && walking && walkBmp == null) {
+            // 没有序列帧才用整体变换假装走路；有帧就交给帧动画
+            float wk = tau * t * 2.4f;
+            float k = Math.min(1f, Math.max(0.25f, walkVel / 4.6f));
+            pDy += (0.015f + 0.05f * k) * ampScale * Math.abs((float) Math.sin(wk));
+            pSy *= 1f + (0.012f + 0.030f * k) * ampScale * (float) Math.sin(wk * 2f);
+            pSx *= 1f - 0.012f * k * ampScale * (float) Math.sin(wk * 2f);
+            dragTilt = (2f + 6f * k) * (float) Math.sin(wk) + walkDir * 2.2f * k;
+        }
+        // 停下时落地压缩回弹，避免急刹
+        if (!still && !walking && walkStopNs != 0L) {
+            float k = (now - walkStopNs) / (0.32f * NS);
+            if (k < 1f) {
+                float s2 = (float) Math.sin(Math.PI * k);
+                pSy *= 1f - 0.05f * (1f - k) * s2;
+                pSx *= 1f + 0.03f * (1f - k) * s2;
+            }
         } else if (!dragging) {
             dragTilt = 0f;
         }
@@ -423,11 +531,15 @@ public class PetView extends View implements Choreographer.FrameCallback {
             else pSy *= 1f - 0.10f * (float) Math.sin(Math.PI * k);
         }
 
-        if (state == STATE_HOVER) drawHover(canvas);
+        if (seqPlaying) {
+            if (drawSeq(canvas, now)) return;
+            // 序列刚结束：这一帧接着画站立图，避免空一帧造成闪烁
+        }
+        if (state == STATE_HOVER) drawHover(canvas, now);
         else drawPerch(canvas, t);
     }
 
-    private void drawHover(Canvas canvas) {
+    private void drawHover(Canvas canvas, long now) {
         float h = dp(hoverHeightDp);
         float w = h * srcW / (float) srcH;
         float ww = getWidth(), hh = getHeight();
@@ -437,9 +549,17 @@ public class PetView extends View implements Choreographer.FrameCallback {
         float halfW = w * pSx / 2f;
 
         RectF dst = new RectF(cx - halfW, top, cx + halfW, bottom);
+        Bitmap bmp = cur;
+        if (walking && walkBmp != null) {
+            if (walkLastNs == 0L) walkLastNs = now;
+            float dt = (now - walkLastNs) / 1_000_000_000f;
+            walkLastNs = now;
+            walkPhase += walkVel * dt * 0.030f;   // 按位移推进，脚步不跟地面打滑
+            bmp = walkBmp[WALK_ORDER[((int) walkPhase) & 3]];
+        }
         canvas.save();
-        canvas.rotate(dragging ? dragTilt : 0f, cx, hh - h * 0.10f);
-        canvas.drawBitmap(cur, null, dst, paint);
+        canvas.rotate(dragging || walking ? dragTilt : 0f, cx, hh - h * 0.10f);
+        canvas.drawBitmap(bmp, null, dst, paint);
         canvas.restore();
     }
 

@@ -36,6 +36,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 
@@ -107,6 +108,8 @@ public class PetService extends Service implements PetView.Listener {
     public static final String KEY_EDGE = "edge";
     public static final String KEY_PERCHED = "perched";
     public static final String KEY_Y = "last_y";
+    public static final String KEY_BUBBLE_STYLE = "bubble_style";   // 0 白 1 深色
+    public static final String KEY_LINES = "custom_lines";          // 换行分隔
 
     public static final float DEFAULT_HOVER_H = 240f;
     public static final float DEFAULT_PERCH_W = 96f;
@@ -126,11 +129,12 @@ public class PetService extends Service implements PetView.Listener {
     private WindowManager.LayoutParams bubbleLp;
     private boolean bubbleAdded;
     private int lastLine = -1;
+    private int bubbleStyle = -1;
     private final Runnable bubbleAutoHide = new Runnable() {
         @Override public void run() { hideBubble(); }
     };
     /** 点她一下会随机说一句。改这里就能加台词。 */
-    private static final String[] LINES = {
+    public static final String[] DEFAULT_LINES = {
             "我是吃白饭的蓝色大肥鱼！",
             "肥？我的肚子是为了让你枕得更软，才不是肥！",
             "你真当我是便宜货啊？",
@@ -261,6 +265,11 @@ public class PetService extends Service implements PetView.Listener {
         }
         if (ACTION_PREVIEW_DUCK.equals(action)) {
             duckSel = prefs.getInt(KEY_DUCK, 0);
+        if (bubbleView != null && bubbleStyle != prefs.getInt(KEY_BUBBLE_STYLE, 0)) {
+            hideBubble();
+            bubbleView = null;
+            bubbleStyle = -1;
+        }
             if (soundPool != null) {
                 int i = Math.max(0, Math.min(duckIds.length - 1, duckSel));
                 if (duckIds[i] != 0) soundPool.play(duckIds[i], 1f, 1f, 1, 0, 1f);
@@ -372,7 +381,9 @@ public class PetService extends Service implements PetView.Listener {
             lp.x = prefs.getInt(KEY_X, lp.x);
             applyLayout();
         }
-        // 定时器状态按当前开关重建，杜绝"开关关了还爬"
+        // 服务被系统重启后字段会回到默认值，先把开关读回来再挂定时器
+        soundOn = prefs.getBoolean(KEY_SOUND, true);
+        wanderOn = prefs.getBoolean(KEY_WANDER, true);
         restartWander();
         return true;
     }
@@ -402,9 +413,14 @@ public class PetService extends Service implements PetView.Listener {
         soundOn = prefs.getBoolean(KEY_SOUND, true);
         wanderOn = prefs.getBoolean(KEY_WANDER, true);
         duckSel = prefs.getInt(KEY_DUCK, 0);
+        if (bubbleView != null && bubbleStyle != prefs.getInt(KEY_BUBBLE_STYLE, 0)) {
+            hideBubble();
+            bubbleView = null;
+            bubbleStyle = -1;
+        }
         // 开关动过就重挂一次定时器 —— 不重挂的话，那个 tick 一旦退出就再也回不来，
         // 表现为"关了还爬"或者"开了不爬"。
-        if (wanderOn != prevWander) restartWander();
+        if (wanderOn != prevWander || !wanderOn) restartWander();
         if (view == null || lp == null) return;
         view.setHoverHeightDp(prefs.getFloat(KEY_HOVER_H, DEFAULT_HOVER_H));
         view.setPerchWidthDp(prefs.getFloat(KEY_PERCH_W, DEFAULT_PERCH_W));
@@ -416,7 +432,7 @@ public class PetService extends Service implements PetView.Listener {
 
     private void applyLayout() {
         if (view == null || lp == null) return;
-        if (!wanderStarted) {                 // 窗口一就位就把溜达的定时器挂上
+        if (wanderOn && !wanderStarted) {     // 窗口一就位就把溜达的定时器挂上（关掉就别挂）
             wanderStarted = true;
             wanderHandler.postDelayed(wanderTick, 4000);
         }
@@ -485,9 +501,13 @@ public class PetService extends Service implements PetView.Listener {
 
     private void showBubble() {
         if (view == null || wm == null || lp == null) return;
-        if (bubbleView == null) {
+        int style = prefs.getInt(KEY_BUBBLE_STYLE, 0);
+        if (bubbleView == null || bubbleStyle != style) {
+            hideBubble();
+            bubbleView = null;
+            bubbleStyle = style;
             bubbleView = new TextView(this);
-            bubbleView.setTextColor(0xFF262A33);
+            bubbleView.setTextColor(style == 1 ? 0xFFF2F5FA : 0xFF262A33);
             bubbleView.setTextSize(14f);
             bubbleView.setLineSpacing(dp(3), 1f);
             bubbleView.setGravity(Gravity.CENTER_VERTICAL);
@@ -495,7 +515,7 @@ public class PetService extends Service implements PetView.Listener {
             bubbleView.setMaxWidth(Math.round(dp(260)));
             bubbleView.setPadding(Math.round(dp(16)), Math.round(dp(10)),
                     Math.round(dp(16)), Math.round(dp(10)) + tail);
-            bubbleView.setBackground(new BubbleBg(0xFFFFFFFF, tail));
+            bubbleView.setBackground(new BubbleBg(style == 1 ? 0xF01B2033 : 0xFFFFFFFF, tail));
             bubbleView.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { hideBubble(); }
             });
@@ -552,11 +572,25 @@ public class PetService extends Service implements PetView.Listener {
     }
 
     private String nextLine() {
-        if (LINES.length == 0) return "";
-        int i = rnd.nextInt(LINES.length);
-        if (i == lastLine) i = (i + 1) % LINES.length;
+        String[] lines = currentLines();
+        if (lines.length == 0) return "";
+        int i = rnd.nextInt(lines.length);
+        if (i == lastLine) i = (i + 1) % lines.length;
         lastLine = i;
-        return LINES[i];
+        return lines[i];
+    }
+
+    /** 用户在设置页自己加的台词；没设过就用默认的 18 句 */
+    private String[] currentLines() {
+        String raw = prefs.getString(KEY_LINES, "");
+        if (raw == null || raw.trim().isEmpty()) return DEFAULT_LINES;
+        String[] parts = raw.split("\n");
+        ArrayList<String> out = new ArrayList<>();
+        for (String p : parts) {
+            String t = p.trim();
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out.isEmpty() ? DEFAULT_LINES : out.toArray(new String[0]);
     }
 
     private static class BubbleBg extends android.graphics.drawable.Drawable {
@@ -712,6 +746,7 @@ public class PetService extends Service implements PetView.Listener {
         if (view == null) return;
         measureScreen();
         perchPull = 0;
+        view.stopWanderSeq();
         view.setState(PetView.STATE_PERCH);
         view.setPerchEdge(PetView.EDGE_BOTTOM);
         view.setMirror(false);
@@ -728,6 +763,7 @@ public class PetService extends Service implements PetView.Listener {
         if (view == null) return;
         measureScreen();   // 兜底：万一旋转监听没触发，这里也要用最新的屏幕尺寸
         perchPull = 0;
+        view.stopWanderSeq();
         view.setState(PetView.STATE_PERCH);
         view.setPerchEdge(right ? PetView.EDGE_RIGHT : PetView.EDGE_LEFT);
         view.setMirror(right);
@@ -756,7 +792,7 @@ public class PetService extends Service implements PetView.Listener {
     // ---- PetView.Listener ----
 
     @Override
-    public void onDragStart() { hideMenu(); hideBubble(); perchPull = 0; }
+    public void onDragStart() { hideMenu(); hideBubble(); perchPull = 0; if (view != null) view.stopWanderSeq(); }
 
     @Override
     public void onDrag(float dx, float dy) {
@@ -832,6 +868,18 @@ public class PetService extends Service implements PetView.Listener {
     /**
      * 单击换表情在 PetView 里做；这里负责音效和缺素材时的兜底提示。
      */
+    @Override
+    public void onWanderSeqEnd() {
+        lp.x = seqToX;
+        try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+        prefs.edit().putInt(KEY_X, lp.x).apply();
+        wanderTargetX = -1f;
+        wanderVel = 0f;
+        wanderWaitUntil = System.currentTimeMillis() + 1500 + rnd.nextInt(2500);
+        wanderHandler.removeCallbacks(wanderTick);
+        wanderHandler.postDelayed(wanderTick, 400);
+    }
+
     @Override
     public void onTap() {
         showBubble();
@@ -992,17 +1040,44 @@ public class PetService extends Service implements PetView.Listener {
     // 同时告诉 View "正在走"（由 View 加摇晃和颠簸）。
     private boolean wanderOn = true;
     private final Handler wanderHandler = new Handler(Looper.getMainLooper());
-    private float wanderX = 0f, wanderTargetX = -1f;
+    private float wanderX = 0f, wanderTargetX = -1f, wanderVel = 0f;
+    private int seqFromX, seqToX;
     private long wanderWaitUntil = 0L;
     private boolean wanderStarted = false;
 
     private final Runnable wanderTick = new Runnable() {
         @Override public void run() {
-            if (!wanderOn || view == null || lp == null) return;
+            if (!wanderOn || view == null || lp == null) {
+                if (view != null) view.setWalking(false);
+                wanderStarted = false;
+                wanderTargetX = -1f;
+                return;
+            }
             if (!prefs.getBoolean(KEY_RUNNING, false)) return;
+            if (view.isWanderSeqPlaying()) {
+                view.setWalking(false);
+                int f = view.getSeqFrame();
+                if (f >= 30 && f <= 74) {
+                    float p = (f - 30) / 44f;
+                    p = p * p * (3f - 2f * p);           // 平滑加减速
+                    lp.x = Math.round(seqFromX + (seqToX - seqFromX) * p);
+                    try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+                } else if (f > 74) {
+                    lp.x = seqToX;
+                    try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+                }
+                wanderHandler.postDelayed(this, 16);
+                return;
+            }
             // 趴边 / 正在被拖 / 刚被碰过 —— 都不动
-            if (view.getState() != PetView.STATE_HOVER
-                    || view.isDragging() || view.msSinceTouch() < 5000) {
+            if (view.getState() != PetView.STATE_HOVER) {
+                // 趴边时不溜达；等回到悬空态由 applyLayout 重新挂
+                view.setWalking(false);
+                wanderStarted = false;
+                wanderTargetX = -1f;
+                return;
+            }
+            if (view.isDragging() || view.msSinceTouch() < 5000) {
                 view.setWalking(false);
                 wanderHandler.postDelayed(this, 300);
                 return;
@@ -1014,27 +1089,74 @@ public class PetService extends Service implements PetView.Listener {
                 return;
             }
             if (wanderTargetX < 0f) {                 // 挑一个新目标
+                if (view.hasWanderSeq()) {            // 有整段动作：转身 → 走过去 → 转回来
+                    view.setWalking(false);
+                    int margin = Math.round(dp(14));
+                    int lo = margin;
+                    int hi = Math.max(margin + 1, screenW - lp.width - margin);
+                    int dist = Math.round(dp(70)) + rnd.nextInt(Math.max(1, Math.round(dp(150))));
+                    int dir = rnd.nextBoolean() ? 1 : -1;
+                    int cand = lp.x + dir * dist;
+                    if (cand < lo || cand > hi) cand = lp.x - dir * dist;
+                    seqFromX = lp.x;
+                    seqToX = Math.max(lo, Math.min(hi, cand));
+                    if (seqToX == seqFromX) seqToX = Math.min(hi, seqFromX + Math.round(dp(80)));
+                    view.setSeqMirror(seqToX > seqFromX);
+                    view.playWanderSeq();
+                    wanderHandler.postDelayed(this, 16);
+                    return;
+                }
                 wanderX = lp.x;
                 int margin = Math.round(dp(14));
                 int hi = Math.max(margin + 1, screenW - lp.width - margin);
-                wanderTargetX = margin + rnd.nextInt(hi - margin);
+                // 目标随机远近：多数是小碎步，偶尔走远一点
+                int span = hi - margin;
+                int step = rnd.nextInt(100) < 65
+                        ? Math.round(dp(20)) + rnd.nextInt(Math.max(1, Math.min(span, Math.round(dp(90)))))
+                        : span / 2 + rnd.nextInt(Math.max(1, span / 2));
+                int dir = rnd.nextBoolean() ? 1 : -1;
+                int cand = Math.round(wanderX) + dir * step;
+                if (cand < margin || cand > hi) cand = Math.round(wanderX) - dir * step;
+                wanderTargetX = Math.max(margin, Math.min(hi, cand));
                 wanderWaitUntil = now + 800;
                 wanderHandler.postDelayed(this, 150);
                 return;
             }
             float d = wanderTargetX - wanderX;
-            if (Math.abs(d) < 3f) {                   // 到站，歇一会儿
+            float dist = Math.abs(d);
+            if (dist < 2.5f && wanderVel < 0.35f) {   // 到站，歇一会儿
                 wanderX = wanderTargetX;
                 wanderTargetX = -1f;
-                wanderWaitUntil = now + 1200 + rnd.nextInt(2400);
+                wanderVel = 0f;
+                view.setWalkMotion(0f, 0f);
                 view.setWalking(false);
+                wanderWaitUntil = now + 1400 + rnd.nextInt(2600);
                 wanderHandler.postDelayed(this, 120);
                 return;
             }
-            wanderX += Math.signum(d) * Math.min(4f, Math.abs(d));
-            lp.x = Math.round(wanderX);
-            try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
-            view.setWalking(true);
+            // 偶尔停下来看看四周，别一路匀速滑过去
+            if (rnd.nextInt(1000) < 10) {
+                wanderVel = 0f;
+                view.setWalkMotion(0f, 0f);
+                view.setWalking(false);
+                wanderWaitUntil = now + 260 + rnd.nextInt(340);
+                wanderHandler.postDelayed(this, 150);
+                return;
+            }
+            // 速度做加减速：离目标越近目标速度越低，再平滑逼近
+            float targetSpeed = Math.min(4.6f, dist * 0.16f);
+            wanderVel += (targetSpeed - wanderVel) * 0.16f;
+            if (wanderVel < 0.05f) wanderVel = 0f;
+            if (wanderVel > 0f) {
+                wanderX += Math.signum(d) * Math.min(wanderVel, dist);
+                lp.x = Math.round(wanderX);
+                try { wm.updateViewLayout(view, lp); } catch (Exception ignored) { }
+                view.setWalking(true);
+                view.setWalkMotion(wanderVel, Math.signum(d));
+            } else {
+                view.setWalkMotion(0f, 0f);
+                view.setWalking(false);
+            }
             wanderHandler.postDelayed(this, 16);
         }
     };
